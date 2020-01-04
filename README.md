@@ -1,4 +1,4 @@
-# Chat-Manager-RegEx
+# Chat-Manager-amxx
 Simple Chat Manager Checker
 
 Options: 
