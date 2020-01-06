@@ -13,9 +13,8 @@
     );
     $table_name = "db_patterns";
     $show_pattern = -1;
-    $patterns = array( 0=>"kick", 1=>"ban", 2=>"hide", 3=>"whitelist" );
-    //$pattern_values = array_keys( $patterns );
-    if( !isset( $_GET['show_pattern'] ) || $_GET['show_pattern'] == 'ban' || ( $_GET['show_pattern'] != 'whitelist' && $_GET['show_pattern'] != 'hide' && $_GET['show_pattern'] != 'kick') )
+    $patterns = array( 0=>"kick", 1=>"ban", 2=>"hide", 3=>"whitelist", 4=>"replace" );
+    if( !isset( $_GET['show_pattern'] ) || $_GET['show_pattern'] == 'ban' || ( $_GET['show_pattern'] != 'whitelist' && $_GET['show_pattern'] != 'hide' && $_GET['show_pattern'] != 'kick'  && $_GET['show_pattern'] != 'replace') )
     {
         //$index_fields = array( "pattern"=>"Pattern", "reason"=>"Reason", "time"=>"Ban Length" );
         $edit_fields = array( "pattern"=>"Pattern", "reason"=>"Reason", "time"=>"Ban Length" );
@@ -37,6 +36,11 @@
     {
         $edit_fields = array( "pattern"=>"Pattern", "reason"=>"Reason" );
         $show_pattern = 0;
+    }
+    else if( $_GET['show_pattern'] == 'replace' )
+    {
+        $edit_fields = array( "pattern"=>"Pattern", "reason"=>"Replace with" );
+        $show_pattern = 4;
     }
     $index_fields = array( "pattern"=>"Pattern" );
     $search_fields = array( "pattern"=>"Pattern", "reason"=>"Reason", "time"=>"Ban Length" );
@@ -145,13 +149,18 @@
             float:right;
             padding: 0;
         }
+        .btnSelected
+        {
+            border: 1px solid #999999;
+            background: #c5c5c5;
+        }
     </style>
     
     <script>
         $(document).ready( function () {
             $('#table_display')
             .dataTable( {
-                //responsive: true,
+                responsive: true,
                 columnDefs: [
                     { targets: [-1], className: 'dt-body-center' }
                 ],
@@ -173,10 +182,11 @@
     
     <a href=<?php echo WEB_URL;?>><button id='HomeButton' class=moveLeft>HOME</button></a> 
     <button id='searchBtn' class=moveLeft>Search</button>
-    <a href="index.php?show_pattern=ban"><button class=moveRight>Ban</button></a>
-    <a href="index.php?show_pattern=hide"><button class=moveRight>Hide</button></a>
-    <a href="index.php?show_pattern=kick"><button class=moveRight>Kick</button></a>
-    <a href="index.php?show_pattern=whitelist"><button class=moveRight>Whitelist</button></a>
+    <a href="index.php?show_pattern=replace"><button class='moveRight <?php echo $show_pattern==4? "btnSelected":""; ?>'>Replace</button></a>
+    <a href="index.php?show_pattern=ban"><button class='moveRight <?php echo $show_pattern==1? "btnSelected":""; ?>'>Ban</button></a>
+    <a href="index.php?show_pattern=hide"><button class='moveRight <?php echo $show_pattern==2? "btnSelected":""; ?>'>Hide</button></a>
+    <a href="index.php?show_pattern=kick"><button class='moveRight <?php echo $show_pattern==0? "btnSelected":""; ?>'>Kick</button></a>
+    <a href="index.php?show_pattern=whitelist"><button class='moveRight <?php echo $show_pattern==3? "btnSelected":""; ?>'>Whitelist</button></a>
     <script>
         $( '#searchBtn' ).click(function() { 
             $( '#searchDiv' ).dialog( 'open' );
@@ -186,6 +196,7 @@
     <div id='searchDiv' title='Search'>
         <form method=GET>
         <?php
+            echo "<input type=hidden value=".$patterns[$show_pattern]." name=show_pattern>";
             foreach( $search_fields as $field=>$field_value )
             {
                 echo "<p>";
@@ -193,6 +204,7 @@
                 echo "</p>";
             }
         ?>  
+        
         <input type=hidden value=1 name=search>
         </form>
     </div>
@@ -297,22 +309,17 @@
                 }
                 while( $r = $result->fetch_assoc())
                 {
-                    //$exp = ($r['expired']>=1)? "dff0d8":"";
                     echo "<tr id='".$r['id']."'>";
                     foreach( $index_fields as $field=>$field_ass )
                     {
-                            echo "<td>";
-                            if( $field == 'date_added' )
-                                echo gmdate("Y-m-d H:i:s", intval($r[$field]));
-                            else
-                                echo $r[$field];
+                            echo "<td id='edit1_".$r['id']."'>";
+                            echo $r[$field];
                             echo "</td>";
                     }
                     echo "<td><button id='edit_".$r['id']."' class=lefty>Edit</button><form method=GET><input type=hidden name=id value='".$r['id']."'><input type=submit name=del value=Delete></form></td>";
                     echo "</tr>";
                     echo "<div id='ban_".$r['id']."' title='Details #".$r['id']."'>";
                     echo "<form action='' method='GET'>";
-                    //echo "<script>alert(".$pattern_values[$show_pattern].");</script>";
                     echo "<input type=hidden value=".$patterns[$show_pattern]." name=show_pattern>";
                     foreach( $edit_fields as $field=>$field_value )
                     {
@@ -336,6 +343,7 @@
                     echo "buttons: [{ text: 'Ok', click: function() { $(this).find('form').submit(); $(this).dialog('close'); }}]";
                     echo "});";
                     echo "$( '#edit_".$r['id']."' ).click(function() { $( '#ban_".$r['id']."' ).dialog( 'open' );});";
+                    echo "$( '#edit1_".$r['id']."' ).click(function() { $( '#ban_".$r['id']."' ).dialog( 'open' );});";
                     echo "</script>";
                 }
             ?>
