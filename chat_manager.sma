@@ -17,7 +17,8 @@ enum _:eActions
     KICK,
     BAN,
     HIDE,
-    WHITELIST
+    WHITELIST,
+    REPLACE
 }
 
 new Array:szWhitePatterns;
@@ -25,6 +26,9 @@ new Array:szPatterns;
 new Array:iBlock;
 new Array:iTime;
 new Array:szReason;
+
+new Array:szReplace;
+new Array:szReplaceWith;
 
 new bool:hasFinished;
 new pBanPattern;
@@ -47,9 +51,52 @@ public plugin_init()
     register_clcmd( "amx_csay", "CmdCheckSay" );
     register_clcmd( "amx_psay", "CmdCheckSay" );
 
+    register_message( get_user_msgid( "SayText" ), "CmdSayText" );
+    //register_event( "SayText", "CmdSayText", "b" );
     tuple = SQL_MakeDbTuple( host, user, pass, db );
 }
 
+public CmdSayText( msgId, msgDest, msgEnt )
+{
+    if( is_user_connected( msgEnt ) )
+    {
+        new szMessage[ 192 ];
+        get_msg_arg_string( 4, szMessage, charsmax( szMessage ) );
+        new max = ArraySize( szReplace );
+        new Regex:rPattern;
+        new subr[ 64 ];
+        new bool:hasChanged = false;
+        for( new i, pattern[ 64 ]; i < max; i++ )
+        {
+            ArrayGetString( szReplace, i, pattern, charsmax( pattern ) );
+
+            rPattern = regex_match( szMessage, pattern );
+                
+            while( _:rPattern > 0 )
+            {
+                hasChanged = true;
+                regex_substr( rPattern, 0, subr, charsmax( subr ) );
+                replace( szMessage, charsmax( szMessage ), subr, fmt( "%a", ArrayGetStringHandle( szReplaceWith, i ) ) );
+                regex_free( rPattern );
+                rPattern = regex_match( szMessage, pattern );
+            }
+        }
+        //regex_free( rPattern );
+        if( hasChanged )
+            set_msg_arg_string( 4, szMessage );
+    }
+}
+
+public plugin_end()
+{
+    ArrayDestroy( szPatterns );
+    ArrayDestroy( szWhitePatterns );
+    ArrayDestroy( iBlock );
+    ArrayDestroy( iTime );
+    ArrayDestroy( szReason );
+    ArrayDestroy( szReplace );
+    ArrayDestroy( szReplaceWith );
+}
 public plugin_cfg()
 {
     set_task( 0.1, "SQL_Init" );
@@ -58,6 +105,8 @@ public plugin_cfg()
     iBlock = ArrayCreate( 1, 1 );
     iTime = ArrayCreate( 1, 1 );
     szReason = ArrayCreate( 64, 1 );
+    szReplace = ArrayCreate( 128, 1 );
+    szReplaceWith = ArrayCreate( 64, 1 );
 }
 
 public SQL_Init()
@@ -96,7 +145,14 @@ public SQL_LoadData( failState, Handle:query, error[], errNum )
         SQL_ReadResult( query, 1, pattern, charsmax( pattern ) );
         blockType = SQL_ReadResult( query, 2 );
 
-        if( blockType == WHITELIST )
+        if( blockType == REPLACE ) 
+        {
+            SQL_ReadResult( query, 1, pattern, charsmax( pattern ) );
+            ArrayPushString( szReplace, pattern );
+            SQL_ReadResult( query, 4, reason, charsmax( reason ) );
+            ArrayPushString( szReplaceWith, reason );
+        }
+        else if( blockType == WHITELIST )
         {
             SQL_ReadResult( query, 1, pattern, charsmax( pattern ) );
             ArrayPushString( szWhitePatterns, pattern );
@@ -155,13 +211,16 @@ public CmdCheckSay( id )
     new max = ArraySize( szWhitePatterns );
     new pattern[ 128 ];
     new i;
-
+    new Regex:rPattern;
     for( i = 0; i < max; i++ )
     {
         ArrayGetString( szWhitePatterns, i, pattern, charsmax( pattern ) );
 
-        if( _:regex_match( args, pattern ) > 0 )
+        if( _:( rPattern = regex_match( args, pattern ) ) > 0 )
+        {
+            regex_free( rPattern );
             return PLUGIN_CONTINUE;
+        }
     }
 
     max = ArraySize( szPatterns );
@@ -172,10 +231,10 @@ public CmdCheckSay( id )
     {
         ArrayGetString( szPatterns, i, pattern, charsmax( pattern ) );
 
-        if( _:regex_match( args, pattern ) > 0 )
+        if( _:( rPattern = regex_match( args, pattern ) ) > 0 )
         {
             blockType = ArrayGetCell( iBlock, i );
-            
+            regex_free( rPattern );
             if( blockType != HIDE )
             {
                 time = ArrayGetCell( iTime, i );
